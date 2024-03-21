@@ -1,23 +1,32 @@
 package main
 
 import (
-    "database/sql"
-    "fmt"
-    _ "github.com/lib/pq"
+    "gorm.io/driver/postgres"
+    "gorm.io/gorm"
+    "log"
 )
 
+type User struct {
+    gorm.Model
+    Name  string
+    Email string `gorm:"type:varchar(100);unique_index"`
+}
+
 func main() {
-    connStr := "user=imaikosuke dbname=go-practice-database sslmode=disable"
-    db, err := sql.Open("postgres", connStr)
+    dsn := "host=localhost user=imaikosuke dbname=go-practice-database sslmode=disable"
+    db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
     if err != nil {
-        panic(err)
-    }
-    defer db.Close()
-
-    err = db.Ping()
-    if err != nil {
-        panic(err)
+        log.Fatalf("データベース接続に失敗しました: %v", err)
     }
 
-    fmt.Println("Successfully connected!")
+    // モデルに基づいてテーブルを作成
+    db.AutoMigrate(&User{})
+
+    // ユーザーを作成
+    db.Create(&User{Name: "Taro", Email: "taro@example.com"})
+
+    // ユーザーを取得
+    var user User
+    db.First(&user, "name = ?", "Taro")
+    log.Printf("取得したユーザー: %#v", user)
 }
