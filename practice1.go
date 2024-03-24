@@ -7,7 +7,7 @@ import (
 
 func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { // ルートパスにアクセスがあった場合の処理
-		fmt.Fprintf(w, "こんにちは、Go言語の世界へ!")                 // レスポンスを返す
+		fmt.Fprintf(w, "Hello HTTP World!")                 // レスポンスを返す
 	})
 
 	fmt.Println("http://localhost:8080 でサーバーを起動します。")   // サーバーを起動する旨を表示
