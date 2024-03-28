@@ -1,13 +1,10 @@
 package main
 
 import (
-    "encoding/json"
-    "fmt"
-    "log"
     "net/http"
     "sync"
 		"strconv"
-    "github.com/gorilla/mux"
+    "github.com/gin-gonic/gin"
 )
 
 // メモリ上に保存するデータ構造
@@ -23,37 +20,36 @@ var (
     idSeq int
 )
 
-// メモリ上に保存するデータを初期化
-func getMemosHandler(w http.ResponseWriter, r *http.Request) {
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(memos)
+func getMemosHandler(c *gin.Context) {
+	c.JSON(http.StatusOK, memos)
 }
 
-// メモリ上に保存するデータを追加
-func createMemoHandler(w http.ResponseWriter, r *http.Request) {
-    var memo Memo
-    if err := json.NewDecoder(r.Body).Decode(&memo); err != nil {
-        http.Error(w, err.Error(), http.StatusBadRequest)
-        return
-    }
+func createMemoHandler(c *gin.Context) {
+	var memo Memo
+	if err := c.ShouldBindJSON(&memo); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-    mu.Lock()
-    idSeq++
-    memo.ID = idSeq
-    memos = append(memos, memo)
-    mu.Unlock()
+	mu.Lock()
+	idSeq++
+	memo.ID = idSeq
+	memos = append(memos, memo)
+	mu.Unlock()
 
-    w.Header().Set("Location", fmt.Sprintf("/memos/%d", memo.ID))
-    w.WriteHeader(http.StatusCreated)
+	c.JSON(http.StatusCreated, memo)
 }
 
-// メモを削除するハンドラー関数
-func deleteMemoHandler(w http.ResponseWriter, r *http.Request) {
-	// URLからメモのIDを取得
-	vars := mux.Vars(r)
-	id, err := strconv.Atoi(vars["id"])
+func updateMemoHandler(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
+			return
+	}
+
+	var newMemo Memo
+	if err := c.ShouldBindJSON(&newMemo); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 	}
 
@@ -61,24 +57,42 @@ func deleteMemoHandler(w http.ResponseWriter, r *http.Request) {
 	defer mu.Unlock()
 	for i, memo := range memos {
 			if memo.ID == id {
-					// メモを削除
-					memos = append(memos[:i], memos[i+1:]...)
-					w.WriteHeader(http.StatusNoContent) // 204 No Content
+					memos[i].Text = newMemo.Text // Update the memo's text
+					c.JSON(http.StatusOK, memos[i])
 					return
 			}
 	}
 
-	// メモが見つからなかった場合
-	http.Error(w, "Memo not found", http.StatusNotFound)
+	c.JSON(http.StatusNotFound, gin.H{"error": "Memo not found"})
 }
 
+func deleteMemoHandler(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
+		return
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	for i, memo := range memos {
+		if memo.ID == id {
+			memos = append(memos[:i], memos[i+1:]...)
+			c.Status(http.StatusNoContent)
+			return
+		}
+	}
+
+	c.JSON(http.StatusNotFound, gin.H{"error": "Memo not found"})
+}
 
 func main() {
-    r := mux.NewRouter()
-    r.HandleFunc("/memos", getMemosHandler).Methods("GET")
-    r.HandleFunc("/memos", createMemoHandler).Methods("POST")
-		r.HandleFunc("/memos/{id:[0-9]+}", deleteMemoHandler).Methods("DELETE")
+	router := gin.Default()
 
-    fmt.Println("Server is running on http://localhost:8080")
-    log.Fatal(http.ListenAndServe(":8080", r))
+	router.GET("/memos", getMemosHandler)
+	router.POST("/memos", createMemoHandler)
+	router.DELETE("/memos/:id", deleteMemoHandler)
+	router.PUT("/memos/:id", updateMemoHandler)
+
+	router.Run(":8080")
 }
