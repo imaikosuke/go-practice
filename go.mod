@@ -3,6 +3,7 @@ module go-practice
 go 1.22.1
 
 require (
+	fyne.io/fyne/v2 v2.4.4 // indirect
 	github.com/bytedance/sonic v1.9.1 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible // indirect
